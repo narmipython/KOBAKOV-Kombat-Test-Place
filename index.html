@@ -6,7 +6,7 @@
 <title>KOBAKOV Kombat: Clicker</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { width:100%; height:100%; font-family:"Segoe UI",sans-serif; background:#1e1f22; color:#fff; user-select:none; overflow:hidden; }
+  html, body { width:100%; height:100%; font-family:"Segoe UI",sans-serif; background:#1e1f22; color:#fff; user-select:none; overflow:hidden; touch-action:manipulation; }
 
   /* Loading */
   #loading { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; z-index:10; }
@@ -14,7 +14,7 @@
   .loading-frame { position:absolute; bottom:0; width:100%; height:50%; background:rgba(32,34,37,0.95); border-top-left-radius:50px; border-top-right-radius:50px; box-shadow:0 -20px 50px rgba(0,0,0,0.6); display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding-bottom:40px; z-index:1; }
   #loadingTitle { font-size:2em; font-weight:bold; margin-bottom:20px; }
   .spinner { border:8px solid #333; border-top:8px solid #fff; border-radius:50%; width:80px; height:80px; margin-bottom:15px; animation:spin 1s linear infinite; }
-  @keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+  @keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);} }
   #loadingText { font-size:1.5em; margin-bottom:10px; }
 
   /* Main */
@@ -49,7 +49,7 @@
   /* Battle Overlay */
   #battleOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:20;}
   #battleCounter,#battleTimer{font-size:24px;margin:10px;}
-  #circleBtnBattle{width:150px;height:150px;border-radius:50%;background:#5865F2;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#fff;}
+  #circleBtnBattle{width:150px;height:150px;border-radius:50%;background:#5865F2;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#fff;user-select:none;}
   #circleBtnBattle:active{transform:scale(0.9);}
 </style>
 </head>
@@ -115,206 +115,187 @@
 </div>
 
 <script>
-  // ----- Loading -----
-  window.addEventListener("load",()=>{
+window.addEventListener("load",()=>{
+  setTimeout(()=>{
+    document.getElementById("loading").style.opacity=0;
     setTimeout(()=>{
-      document.getElementById("loading").style.opacity=0;
-      setTimeout(()=>{
-        document.getElementById("loading").style.display="none";
-        document.getElementById("main").style.display="block";
-        initBattles();
-        updateButtons();
-        updateDisplay();
-      },500);
-    },1500);
+      document.getElementById("loading").style.display="none";
+      document.getElementById("main").style.display="block";
+      initBattles(); updateButtons(); updateDisplay();
+    },500);
+  },1500);
+});
+
+// Navigation
+const navBtns=document.querySelectorAll(".navBtn");
+const screens=document.querySelectorAll(".screen");
+const title=document.getElementById("titleText");
+function showScreen(id,text){screens.forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");title.textContent=text;}
+function setActiveButton(id){navBtns.forEach(b=>b.classList.remove("active"));document.getElementById(id).classList.add("active");}
+document.getElementById("btnBattles").onclick=()=>{showScreen("battlesScreen","⚔️ Battles");setActiveButton("btnBattles");};
+document.getElementById("btnClick").onclick=()=>{showScreen("clickScreen","💥 Clicker");setActiveButton("btnClick");};
+document.getElementById("btnUpgrade").onclick=()=>{showScreen("upgradeScreen","⚙️ Upgrade");setActiveButton("btnUpgrade");};
+
+// Clicker
+const circle=document.getElementById("circleBtn");
+const counter=document.getElementById("clickCounter");
+const levelBar=document.getElementById("levelBar");
+const notifContainer=document.getElementById("notifContainer");
+
+let clicks=+localStorage.getItem("clicks")||0;
+let clickPower=+localStorage.getItem("clickPower")||1;
+let level=+localStorage.getItem("level")||1;
+let levelClicks=+localStorage.getItem("levelClicks")||0;
+
+function showNotification(msg){
+  const notif=document.createElement("div");
+  notif.textContent=msg;
+  Object.assign(notif.style,{
+    background:"rgba(255,215,0,0.9)",
+    color:"#000",padding:"10px 20px",borderRadius:"10px",marginTop:"5px",
+    fontWeight:"bold",boxShadow:"0 0 10px rgba(0,0,0,0.5)",
+    opacity:"0",transition:"opacity 0.3s"
   });
+  notifContainer.appendChild(notif);
+  requestAnimationFrame(()=>notif.style.opacity="1");
+  setTimeout(()=>{notif.style.opacity="0";setTimeout(()=>notif.remove(),800);},1500);
+}
 
-  // ----- Navigation -----
-  const navBtns=document.querySelectorAll(".navBtn");
-  const screens=document.querySelectorAll(".screen");
-  const title=document.getElementById("titleText");
-  function showScreen(id,text){screens.forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");title.textContent=text;}
-  function setActiveButton(id){navBtns.forEach(b=>b.classList.remove("active"));document.getElementById(id).classList.add("active");}
-  document.getElementById("btnBattles").onclick=()=>{showScreen("battlesScreen","⚔️ Battles");setActiveButton("btnBattles");};
-  document.getElementById("btnClick").onclick=()=>{showScreen("clickScreen","💥 Clicker");setActiveButton("btnClick");};
-  document.getElementById("btnUpgrade").onclick=()=>{showScreen("upgradeScreen","⚙️ Upgrade");setActiveButton("btnUpgrade");};
+function updateDisplay(){
+  counter.textContent=`Clicks: ${clicks} | Level: ${level}`;
+  const maxForLevel=level*10;
+  const percent=Math.min((levelClicks/maxForLevel)*100,100);
+  levelBar.style.width=percent+"%";
+  const img=circle.querySelector("img");
+  img.src=level>=50?"Click_Image_lvl50.png":"Click_Image.png";
+}
 
-  // ----- Clicker -----
-  const circle=document.getElementById("circleBtn");
-  const counter=document.getElementById("clickCounter");
-  const levelBar=document.getElementById("levelBar");
-  const notifContainer=document.getElementById("notifContainer");
-
-  let clicks=Number(localStorage.getItem("clicks")||0);
-  let clickPower=Number(localStorage.getItem("clickPower")||1);
-  let level=Number(localStorage.getItem("level")||1);
-  let levelClicks=Number(localStorage.getItem("levelClicks")||0);
-
-  function showNotification(msg){
-    const notif=document.createElement("div");
-    notif.textContent=msg;
-    notif.style.background="rgba(255,215,0,0.9)";
-    notif.style.color="#000";
-    notif.style.padding="10px 20px";
-    notif.style.borderRadius="10px";
-    notif.style.marginTop="5px";
-    notif.style.fontWeight="bold";
-    notif.style.boxShadow="0 0 10px rgba(0,0,0,0.5)";
-    notif.style.opacity="0";
-    notif.style.transition="opacity 0.3s";
-    notifContainer.appendChild(notif);
-    requestAnimationFrame(()=>notif.style.opacity="1");
-    setTimeout(()=>{
-      notif.style.opacity="0";
-      setTimeout(()=>notif.remove(),800);
-    },1500);
+function handleClick(){
+  clicks+=clickPower;
+  levelClicks+=clickPower;
+  const maxForLevel=level*10;
+  if(levelClicks>=maxForLevel){
+    level++;
+    clicks+=10;
+    showNotification(`Level ${level-1} reached! +10 clicks`);
+    levelClicks=0;
   }
+  localStorage.setItem("clicks",clicks);
+  localStorage.setItem("clickPower",clickPower);
+  localStorage.setItem("level",level);
+  localStorage.setItem("levelClicks",levelClicks);
+  updateDisplay(); updateButtons();
+}
 
-  function updateDisplay(){
-    counter.textContent=`Clicks: ${clicks} | Level: ${level}`;
-    const maxForLevel=level*10;
-    const percent=Math.min((levelClicks/maxForLevel)*100,100);
-    levelBar.style.width=percent+"%";
+// Sensitive multi-touch support
+circle.addEventListener("pointerdown",handleClick,{passive:true});
 
-    // change image at level 50
-    const img=circle.querySelector("img");
-    if(level>=50) img.src="Click_Image_lvl50.png"; else img.src="Click_Image.png";
-  }
+// Upgrades
+const upgrades=[{id:"upgrade1",baseCost:10,power:1,level:0},{id:"upgrade2",baseCost:50,power:3,level:0}];
+upgrades.forEach(u=>u.level=+localStorage.getItem(u.id+"_level")||0);
 
-  circle.addEventListener("click",()=>{
-    clicks+=clickPower;
-    levelClicks+=clickPower;
-    let maxForLevel=level*10;
-    if(levelClicks>=maxForLevel){
-      level++;
-      clicks+=10; // reward
-      showNotification(`Level ${level-1} reached! +10 clicks`);
-      levelClicks=0;
-    }
-    localStorage.setItem("clicks",clicks);
-    localStorage.setItem("clickPower",clickPower);
-    localStorage.setItem("level",level);
-    localStorage.setItem("levelClicks",levelClicks);
-    updateDisplay();
-    updateButtons();
-  });
-
-  // ----- Upgrades -----
-  const upgrades=[{id:"upgrade1",baseCost:10,power:1,level:0},{id:"upgrade2",baseCost:50,power:3,level:0}];
-  upgrades.forEach(u=>u.level=Number(localStorage.getItem(u.id+"_level")||0));
-
-  function updateButtons(){
-    upgrades.forEach(u=>{
-      const btn=document.getElementById(u.id);
-      const cost=u.baseCost*(1+u.level);
-      btn.textContent=`Upgrade +${u.power} Cost: ${cost}`;
-      btn.disabled=clicks<cost;
-    });
-  }
-
+function updateButtons(){
   upgrades.forEach(u=>{
     const btn=document.getElementById(u.id);
-    btn.addEventListener("click",()=>{
-      const cost=u.baseCost*(1+u.level);
-      if(clicks>=cost){
-        clicks-=cost;
-        clickPower+=u.power;
-        u.level++;
-        localStorage.setItem(u.id+"_level",u.level);
-        localStorage.setItem("clicks",clicks);
-        localStorage.setItem("clickPower",clickPower);
-        updateDisplay();
-        updateButtons();
-      }
-    });
+    const cost=u.baseCost*(1+u.level);
+    btn.textContent=`Upgrade +${u.power} Cost: ${cost}`;
+    btn.disabled=clicks<cost;
   });
+}
 
-  document.getElementById("resetProgress").addEventListener("click",()=>{
-    if(confirm("Reset clicks, level, and upgrades?")){
-      clicks=0; clickPower=1; level=1; levelClicks=0;
-      upgrades.forEach(u=>{u.level=0; localStorage.setItem(u.id+"_level",0);});
-      localStorage.setItem("clicks",0);
-      localStorage.setItem("clickPower",1);
-      localStorage.setItem("level",1);
-      localStorage.setItem("levelClicks",0);
-      updateDisplay();
-      updateButtons();
-    }
-  });
-
-  // ----- Battles -----
-  const battleOverlay=document.getElementById("battleOverlay");
-  const battleCounter=document.getElementById("battleCounter");
-  const battleTimer=document.getElementById("battleTimer");
-  const circleBtnBattle=document.getElementById("circleBtnBattle");
-
-  const battlesData=[
-    {id:"battle1",name:"First Battle",threat:"Small minion",requiredClicks:100,time:30,reward:100},
-    {id:"battle2",name:"Second Battle",threat:"Medium Kobakov",requiredClicks:200,time:25,reward:250},
-    {id:"battle3",name:"Final Battle",threat:"Kobakov Boss",requiredClicks:500,time:40,reward:500}
-  ];
-
-  let currentBattle=null, battleClicks=0, battleTime=0, battleInterval=null;
-
-  function initBattles(){
-    const container=document.getElementById("battlesContainer");
-    container.innerHTML="";
-    battlesData.forEach(b=>{
-      const lastTime=Number(localStorage.getItem(b.id+"_time")||0);
-      const now=Date.now();
-      const locked=(now-lastTime)<24*60*60*1000;
-      const remaining=locked?Math.ceil((24*60*60*1000-(now-lastTime))/3600000):0;
-      const div=document.createElement("div");
-      div.className="box";
-      div.innerHTML=`<h3>${b.name}</h3><p>Threat: ${b.threat}</p><button id="${b.id}_btn"${locked?" disabled":""}>Battle</button><p id="${b.id}_status">${locked?"Locked. Try in "+remaining+"h":""}</p>`;
-      container.appendChild(div);
-
-      const btn=document.getElementById(b.id+"_btn");
-      const status=document.getElementById(b.id+"_status");
-      btn.addEventListener("click",()=>startBattle(b,btn,status));
-    });
-  }
-
-  function startBattle(battleData,btn,statusEl){
-    currentBattle={...battleData,btn,statusEl};
-    battleClicks=0;
-    battleTime=battleData.time;
-    battleCounter.textContent=`Clicks: 0 / ${battleData.requiredClicks}`;
-    battleTimer.textContent=`Time Left: ${battleTime}s`;
-    battleOverlay.style.display="flex";
-    battleInterval=setInterval(()=>{
-      battleTime--;
-      battleTimer.textContent=`Time Left: ${battleTime}s`;
-      if(battleTime<=0){
-        clearInterval(battleInterval);
-        battleOverlay.style.display="none";
-        showNotification("You failed the battle!");
-        currentBattle=null;
-      }
-    },1000);
-  }
-
-  circleBtnBattle.addEventListener("click",()=>{
-    if(!currentBattle) return;
-    battleClicks++;
-    battleCounter.textContent=`Clicks: ${battleClicks} / ${currentBattle.requiredClicks}`;
-    if(battleClicks>=currentBattle.requiredClicks){
-      clearInterval(battleInterval);
-      clicks+=currentBattle.reward;
+upgrades.forEach(u=>{
+  document.getElementById(u.id).addEventListener("click",()=>{
+    const cost=u.baseCost*(1+u.level);
+    if(clicks>=cost){
+      clicks-=cost; clickPower+=u.power; u.level++;
+      localStorage.setItem(u.id+"_level",u.level);
       localStorage.setItem("clicks",clicks);
-      counter.textContent=`Clicks: ${clicks} | Level: ${level}`;
-      const now=Date.now();
-      localStorage.setItem(currentBattle.id+"_time",now);
-      currentBattle.statusEl.textContent="Completed! Come back in 24h.";
-      currentBattle.btn.disabled=true;
-      battleOverlay.style.display="none";
-      showNotification(`Victory! You earned ${currentBattle.reward} clicks!`);
-      currentBattle=null;
-      updateButtons();
-      updateDisplay();
+      localStorage.setItem("clickPower",clickPower);
+      updateDisplay(); updateButtons();
     }
   });
+});
 
+document.getElementById("resetProgress").addEventListener("click",()=>{
+  if(confirm("Reset clicks, level, and upgrades?")){
+    clicks=0; clickPower=1; level=1; levelClicks=0;
+    upgrades.forEach(u=>{u.level=0; localStorage.setItem(u.id+"_level",0);});
+    localStorage.setItem("clicks",0);
+    localStorage.setItem("clickPower",1);
+    localStorage.setItem("level",1);
+    localStorage.setItem("levelClicks",0);
+    updateDisplay(); updateButtons();
+  }
+});
+
+// Battles
+const battleOverlay=document.getElementById("battleOverlay");
+const battleCounter=document.getElementById("battleCounter");
+const battleTimer=document.getElementById("battleTimer");
+const circleBtnBattle=document.getElementById("circleBtnBattle");
+
+const battlesData=[
+  {id:"battle1",name:"First Battle",threat:"Small minion",requiredClicks:100,time:30,reward:100},
+  {id:"battle2",name:"Second Battle",threat:"Medium Kobakov",requiredClicks:200,time:25,reward:250},
+  {id:"battle3",name:"Final Battle",threat:"Kobakov Boss",requiredClicks:500,time:40,reward:500}
+];
+
+let currentBattle=null,battleClicks=0,battleTime=0,battleInterval=null;
+
+function initBattles(){
+  const c=document.getElementById("battlesContainer");
+  c.innerHTML="";
+  const now=Date.now();
+  battlesData.forEach(b=>{
+    const last=+localStorage.getItem(b.id+"_time")||0;
+    const locked=(now-last)<86400000;
+    const rem=locked?Math.ceil((86400000-(now-last))/3600000):0;
+    const div=document.createElement("div");
+    div.className="box";
+    div.innerHTML=`<h3>${b.name}</h3><p>Threat: ${b.threat}</p><button id="${b.id}_btn"${locked?" disabled":""}>Battle</button><p id="${b.id}_status">${locked?"Locked. Try in "+rem+"h":""}</p>`;
+    c.appendChild(div);
+    const btn=document.getElementById(b.id+"_btn"),status=document.getElementById(b.id+"_status");
+    btn.addEventListener("click",()=>startBattle(b,btn,status));
+  });
+}
+
+function startBattle(data,btn,status){
+  currentBattle={...data,btn,status};
+  battleClicks=0; battleTime=data.time;
+  battleCounter.textContent=`Clicks: 0 / ${data.requiredClicks}`;
+  battleTimer.textContent=`Time Left: ${battleTime}s`;
+  battleOverlay.style.display="flex";
+  battleInterval=setInterval(()=>{
+    battleTime--;
+    battleTimer.textContent=`Time Left: ${battleTime}s`;
+    if(battleTime<=0){
+      clearInterval(battleInterval);
+      battleOverlay.style.display="none";
+      showNotification("You failed the battle!");
+      currentBattle=null;
+    }
+  },1000);
+}
+
+circleBtnBattle.addEventListener("pointerdown",()=>{
+  if(!currentBattle)return;
+  battleClicks++;
+  battleCounter.textContent=`Clicks: ${battleClicks} / ${currentBattle.requiredClicks}`;
+  if(battleClicks>=currentBattle.requiredClicks){
+    clearInterval(battleInterval);
+    clicks+=currentBattle.reward;
+    localStorage.setItem("clicks",clicks);
+    counter.textContent=`Clicks: ${clicks} | Level: ${level}`;
+    localStorage.setItem(currentBattle.id+"_time",Date.now());
+    currentBattle.status.textContent="Completed! Come back in 24h.";
+    currentBattle.btn.disabled=true;
+    battleOverlay.style.display="none";
+    showNotification(`Victory! +${currentBattle.reward} clicks`);
+    currentBattle=null;
+    updateButtons(); updateDisplay();
+  }
+},{passive:true});
 </script>
 </body>
 </html>
+
